@@ -1,0 +1,104 @@
+---
+title: "Reproducible Research: Peer Assessment 2"
+author: "Nicholas Wee"
+date: "Wednesday, March 18, 2015"
+output: 
+    html_document: 
+        keep_md: true
+---
+
+```{r cache=TRUE}
+## Libraries
+library(dplyr)
+library(data.table)
+library(R.utils)
+library(lubridate)
+
+## Create data folder if it doesn't exists
+if (!file.exists("./data")) dir.create("./data")
+
+## Define the input source and file
+fileURL <- "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2"
+
+targetURL <- "./data/repdata_data_StormData.csv.bz2"
+
+## Download the file from the URL provided in the project brief
+if (!file.exists(gsub("[.]bz2$", "", targetURL))) {
+    setInternet2(TRUE)
+    download.file(fileURL, destfile = targetURL)
+    bunzip2(targetURL)
+}
+targetURL <- gsub("[.]bz2$", "", targetURL)
+storm_data <- read.csv(targetURL, header = TRUE, stringsAsFactor = FALSE, 
+                       na.strings = "?")
+
+```
+
+```{r cache=TRUE}
+## Remove the NA EVTYPE from storm_data
+storm_data <- storm_data[!is.na(storm_data$EVTYPE), ]
+
+## Create a year to allow analysis over the years for the same event to 
+## understand the trend of the event in terms of impact
+storm_data$BGN_DATE_YR <- year(as.Date(storm_data$BGN_DATE, format="%m/%d/%Y %H:%M:%S"))
+
+## Clean the Even types.  Visual exploration had shown that it has issues such as
+## leading and trailing spaces, same event but using different "codes", etc.
+# Change EVTYPE to upper case and triming of leading and trailing spaces
+storm_data$EVTYPE <- as.factor(toupper(trim(storm_data$EVTYPE)))
+
+## Measure for "harmful to population health" is the sum of total fatalities and total injuries
+## Measure for "greatest economic consequences" is the sum of total property and total crop damages
+```
+
+```{r cache=TRUE}
+## Two summaries are taken for initial analysis: 
+#  The first sums the measures grouped by events but regardless of years
+storm_summary0 <- storm_data %>% 
+    group_by(EVTYPE) %>% 
+    summarise(Total_Fatalities = sum(FATALITIES), 
+              Total_Injuries = sum(INJURIES),
+              Total_Hlth_Impact = sum(FATALITIES + INJURIES),
+              Total_PropDmg = sum(PROPDMG), 
+              Total_CropDmg = sum(CROPDMG),
+              Total_Econ_Impact = sum(PROPDMG + CROPDMG))
+
+#  The second sums the measures group by events and years
+storm_summary1 <- storm_data %>% 
+    group_by(EVTYPE, BGN_DATE_YR) %>% 
+    summarise(Total_Fatalities = sum(FATALITIES), 
+              Total_Injuries = sum(INJURIES),
+              Total_Hlth_Impact = sum(FATALITIES + INJURIES),
+              Total_PropDmg = sum(PROPDMG), 
+              Total_CropDmg = sum(CROPDMG),
+              Total_Econ_Impact = sum(PROPDMG + CROPDMG))
+
+```
+
+```{r cache=TRUE}
+
+# Analysing top Events in terms of Total_Hlth_Impact
+storm_sum_health <- arrange(storm_summary0, desc(Total_Hlth_Impact))
+
+# Analysing top Events in terms of Total_Econ_Impact
+storm_sum_econ <- arrange(storm_summary0, desc(Total_Econ_Impact))
+
+```
+
+```{r cache=TRUE}
+# Analysing top Event (Tornado) in terms of Total_Hlth_Impact across years
+storm_sum_tornado_yrs <- filter(storm_summary1, EVTYPE == "TORNADO") %>%
+    arrange(desc(BGN_DATE_YR))
+
+```
+
+```{r}
+print(storm_sum_health)
+
+select(storm_sum_econ, EVTYPE, Total_PropDmg, Total_CropDmg, Total_Econ_Impact)
+
+print(storm_sum_hlth_yrs)
+
+select(storm_summ_econ_yrs, EVTYPE, BGN_DATE_YR, Total_PropDmg, Total_CropDmg, Total_Econ_Impact)
+
+```
